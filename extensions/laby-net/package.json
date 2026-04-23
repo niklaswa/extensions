@@ -24,6 +24,13 @@
       "subtitle": "laby.net",
       "description": "Searches Minecraft skins & capes",
       "mode": "view"
+    },
+    {
+      "name": "manage-library",
+      "title": "Manage Texture Library",
+      "subtitle": "laby.net",
+      "description": "View, add, and remove textures in your personal Laby.net library.",
+      "mode": "view"
     }
   ],
   "dependencies": {

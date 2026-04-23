@@ -1,5 +1,46 @@
 import axios, { AxiosInstance } from "axios";
 import { Cache, LocalStorage } from "@raycast/api";
+import { getAccessToken } from "./oauth";
+
+interface TextureLibraryTextureItem {
+  id: number;
+  type: string;
+  image_hash: string;
+  use_count: number;
+  file_hash: string;
+  slim_skin: boolean | null;
+  difference_hash: string | null;
+  minecraft_texture_hash: string | null;
+}
+
+interface TextureLibraryResponse {
+  textures: TextureLibraryTextureItem[];
+}
+
+interface TextureLibraryTexture {
+  id: number;
+  type: string;
+  imageHash: string;
+  useCount: number;
+  fileHash: string;
+  slimSkin: boolean | null;
+  differenceHash: string | null;
+  minecraftTextureHash: string | null;
+}
+
+interface TextureMetaItem {
+  id: number;
+  name: string;
+  description?: Record<string, string> | null;
+  difference_hash?: string | null;
+}
+
+interface TextureMeta {
+  id: number;
+  name: string;
+  description: Record<string, string> | null;
+  differenceHash: string | null;
+}
 
 interface Profile {
   uuid: string;
@@ -144,6 +185,79 @@ class Service {
         "User-Agent": "Raycast Extension",
       },
     });
+
+    // Automatically attach access token to every request when the user is logged in.
+    this.client.interceptors.request.use(async (config) => {
+      try {
+        const accessToken = await getAccessToken();
+        if (accessToken) {
+          config.headers = config.headers ?? {};
+          config.headers.Authorization = `Bearer ${accessToken}`;
+        }
+      } catch (error) {
+        console.error("Failed to attach access token:", error);
+      }
+      return config;
+    });
+  }
+
+  async getLibrary(type?: string): Promise<TextureLibraryTexture[]> {
+    const params = new URLSearchParams();
+    if (type) {
+      params.set("type", type.toUpperCase());
+    }
+    const queryString = params.toString();
+    const url = `v3/user/texture-library${queryString ? `?${queryString}` : ""}`;
+    const response = await this.client.get<TextureLibraryResponse>(url);
+    return response.data.textures.map((t) => ({
+      id: t.id,
+      type: t.type,
+      imageHash: t.image_hash,
+      useCount: t.use_count,
+      fileHash: t.file_hash,
+      slimSkin: t.slim_skin,
+      differenceHash: t.difference_hash,
+      minecraftTextureHash: t.minecraft_texture_hash,
+    }));
+  }
+
+  async isInLibrary(textureId: number): Promise<boolean> {
+    try {
+      await this.client.get<void>(`v3/user/texture-library/${textureId}`);
+      return true;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  async addToLibrary(textureId: number): Promise<void> {
+    await this.client.put(`v3/user/texture-library/${textureId}`);
+  }
+
+  async removeFromLibrary(textureId: number): Promise<void> {
+    await this.client.delete(`v3/user/texture-library/${textureId}`);
+  }
+
+  async getTextureMeta(imageHash: string, type: string): Promise<TextureMeta | null> {
+    try {
+      const response = await this.client.get<TextureMetaItem>(
+        `v3/texture/${imageHash}/${type.toLowerCase()}/meta`,
+      );
+      return {
+        id: response.data.id,
+        name: response.data.name,
+        description: response.data.description ?? null,
+        differenceHash: response.data.difference_hash ?? null,
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   async getLatestSearches(): Promise<SearchResultEntry[]> {
@@ -283,13 +397,17 @@ class Service {
     });
   }
 
-  async searchTextures(type: string, input: string): Promise<TextureSearchResult> {
+  async searchTextures(type: string, input: string, size?: number): Promise<TextureSearchResult> {
     const params: Record<string, string> = {
       order: "most_used",
     };
 
     if (input !== "") {
       params["input"] = input;
+    }
+
+    if (size !== undefined) {
+      params["size"] = size.toString();
     }
 
     const response = await this.client.get<TextureSearchResultItem>(`v3/search/textures/${type.toLowerCase()}`, {
@@ -321,4 +439,6 @@ export type {
   Badge,
   TextureSearchResult,
   TextureSearchTexture,
+  TextureLibraryTexture,
+  TextureMeta,
 };

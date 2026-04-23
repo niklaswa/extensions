@@ -1,6 +1,8 @@
-import { ActionPanel, Action, showToast, Toast, Image, Grid } from "@raycast/api";
+import { ActionPanel, Action, showToast, Toast, Image, Grid, Icon } from "@raycast/api";
 import { useEffect, useState } from "react";
 import Service, { TextureSearchTexture } from "./service";
+import { authorize } from "./oauth";
+import TextureDetail from "./texture-detail";
 
 const service = new Service();
 
@@ -86,7 +88,32 @@ export default function Command() {
             subtitle={entry.name === undefined ? "" : entry.useCount.toLocaleString() + " Users"}
             actions={
               <ActionPanel>
+                <Action.Push
+                  title="Show Details"
+                  icon={Icon.Eye}
+                  target={<TextureDetail imageHash={entry.imageHash} type={type.type as "SKIN" | "CAPE"} />}
+                />
                 <Action.OpenInBrowser url={type.url.replace("%s", entry.imageHash)} />
+                <Action
+                  title="Add to Library"
+                  icon={Icon.Plus}
+                  shortcut={{ modifiers: ["cmd"], key: "l" }}
+                  onAction={async () => {
+                    try {
+                      await authorize();
+                      const meta = await service.getTextureMeta(entry.imageHash, type.type);
+                      if (!meta) {
+                        await showToast(Toast.Style.Failure, "Texture not found");
+                        return;
+                      }
+                      await service.addToLibrary(meta.id);
+                      await showToast(Toast.Style.Success, "Added to library", meta.name ?? undefined);
+                    } catch (err) {
+                      const message = err instanceof Error ? err.message : "Unknown error";
+                      await showToast(Toast.Style.Failure, "Failed to add to library", message);
+                    }
+                  }}
+                />
               </ActionPanel>
             }
           />
