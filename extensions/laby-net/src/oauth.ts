@@ -4,7 +4,7 @@ import axios from "axios";
 const CLIENT_ID = "f452239e-3c09-42d3-bf42-87f449829856";
 const AUTHORIZE_URL = "https://laby.net/oauth/authorize";
 const TOKEN_URL = "https://laby.net/api/v3/oauth/token";
-const SCOPE = "openid profile";
+const SCOPE = "openid profile user:textures user:textures:edit";
 
 const log = (message: string, data?: unknown) => {
   if (data !== undefined) {

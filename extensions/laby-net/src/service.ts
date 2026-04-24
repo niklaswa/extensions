@@ -186,8 +186,14 @@ class Service {
       },
     });
 
-    // Automatically attach access token to every request when the user is logged in.
+    // Attach access token only to endpoints that require authentication.
+    // Laby.net rejects public endpoints with 403 when a bearer token is sent.
     this.client.interceptors.request.use(async (config) => {
+      const url = config.url ?? "";
+      const requiresAuth = url.startsWith("v3/user/texture-library");
+      if (!requiresAuth) {
+        return config;
+      }
       try {
         const accessToken = await getAccessToken();
         if (accessToken) {
